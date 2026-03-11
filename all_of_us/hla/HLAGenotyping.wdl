@@ -79,6 +79,8 @@ workflow HLAGenotyping {
     }
 
     output {
+        File hla_bam = MakeHLAOnlyBamsAndFastqs.hla_bam
+        File hla_bai = MakeHLAOnlyBamsAndFastqs.hla_bam_idx
         File hlahd_raw_result = HLAHD.raw_result
         File hlahd_converted_result = HLAHD.converted_result
         Int hlahd_two_field_count = HLAHD.two_field_count
