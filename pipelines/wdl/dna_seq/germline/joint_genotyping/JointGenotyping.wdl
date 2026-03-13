@@ -137,7 +137,8 @@ workflow JointGenotyping {
           ref_fasta_index = ref_fasta_index,
           ref_dict = ref_dict,
           disk_size_gb = small_disk,
-          sample_names_unique_done = CheckSamplesUnique.samples_unique
+          sample_names_unique_done = CheckSamplesUnique.samples_unique,
+          extra_args = split_interval_list_extra_args
       }
 
       Array[File] gnarly_intervals = GnarlyIntervalScatterDude.output_intervals
