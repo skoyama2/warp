@@ -916,7 +916,6 @@ task CrossCheckFingerprint {
       --INPUT gvcf_inputs.list \
       --SECOND_INPUT vcf_inputs.list \
       --HAPLOTYPE_MAP ~{haplotype_database} \
-      --INPUT_SAMPLE_FILE_MAP ~{sample_name_map} \
       --CROSSCHECK_BY SAMPLE \
       --CROSSCHECK_MODE CHECK_SAME_SAMPLE \
       --NUM_THREADS ~{cpu} \
