@@ -348,3 +348,9 @@ workflows:
   - name: WholeGenomeReprocessing
     subclass: WDL
     primaryDescriptorPath: /pipelines/wdl/reprocessing/wgs/WholeGenomeReprocessing.wdl
+
+  - name: Glimpse2LowPassImputationCrams
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/wdl/glimpse/low_pass_imputation/Glimpse2LowPassImputationCrams.wdl
+
+
