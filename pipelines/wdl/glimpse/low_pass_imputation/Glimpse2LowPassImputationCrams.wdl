@@ -37,13 +37,17 @@ workflow Glimpse2LowPassImputationCrams {
     }
 
     call GlimpseLigate {
-
          input:
              imputed_chunks = GlimpsePhase.imputed_vcf,
              imputed_chunks_indices = GlimpsePhase.imputed_vcf_index,
              ref_fasta_dict = ref_fasta_dict,
-             output_basename =  output_basename,
+             output_basename = output_basename,
              docker = docker
+    }
+
+    output {
+        File imputed_vcf = GlimpseLigate.imputed_vcf
+        File imputed_vcf_index = GlimpseLigate.imputed_vcf_index
     }
     
 }
@@ -52,17 +56,19 @@ task GlimpseLigate {
 
     input {
 
-        Array[File] imputed_chunks
-        Array[File] imputed_chunks_indices
+        String output_basename
 
         File ref_fasta_dict
-        String output_basename
+
+        Array[File] imputed_chunks
+        Array[File] imputed_chunks_indices
 
         Int mem_gb = 16 
         Int disk_size_gb = 100
         Int cpu = 4
         Int preemptible = 1
         Int max_retries = 2
+
         String docker
 
     }
@@ -113,10 +119,11 @@ task GlimpsePhase{
 
     input {
 
+        File reference_chunk
+
         Array[File] crams
         Array[File] crais
         Array[String] sample_ids
-        File reference_chunk
 
         File ref_fasta
         File ref_fasta_index
