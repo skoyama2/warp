@@ -353,4 +353,7 @@ workflows:
     subclass: WDL
     primaryDescriptorPath: /pipelines/wdl/glimpse/low_pass_imputation/Glimpse2LowPassImputationCrams.wdl
 
+  - name: Glimpse2MakeReference
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/wdl/glimpse/low_pass_imputation/Glimpse2MakeReference.wdl
 
