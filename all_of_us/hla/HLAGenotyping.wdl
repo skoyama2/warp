@@ -21,7 +21,7 @@ workflow HLAGenotyping {
         File count_two_field_alleles_python_script
         File hla_groups_file
 
-        String? gcs_project_for_requester_pays
+        String? google_project
         # WDL version 1.0 does not have an empty Optional literal
         # such a literal is very useful because Terra has a bug where whenever a data table is updated, empty values
         # silently and invisibly get converted to empty strings "".  Thus it is useful to recognize empty strings and
@@ -34,7 +34,7 @@ workflow HLAGenotyping {
     call MakeHLAOnlyBamsAndFastqs {
         input:
             gatk_docker = gatk_docker,
-            gcs_project_for_requester_pays = if select_first([gcs_project_for_requester_pays, ""]) == "" then EMPTY_STRING_HACK else gcs_project_for_requester_pays,
+            google_project = if select_first([google_project, ""]) == "" then EMPTY_STRING_HACK else google_project,
             original_bam = original_bam,
             original_bam_idx = original_bam_idx,
             ref_fasta = ref_fasta,
@@ -95,7 +95,7 @@ workflow HLAGenotyping {
 task MakeHLAOnlyBamsAndFastqs {
     input {
         String gatk_docker
-        String? gcs_project_for_requester_pays
+        String? google_project
         File original_bam       # this can be a BAM or CRAM
         File original_bam_idx
         File ref_fasta          # GATK PrintReads requires a reference for CRAMs
@@ -125,7 +125,7 @@ task MakeHLAOnlyBamsAndFastqs {
         # this command also produces the accompanying index hla.bai
         # the PairedReadFilter is necessary for SamtoFastq to succeed
         gatk PrintReads -R ~{ref_fasta} -I ~{original_bam} -L ~{hla_intervals} -O hla-unsorted.bam \
-            ~{"--gcs-project-for-requester-pays " + gcs_project_for_requester_pays}
+            ~{if select_first([google_project, ""]) != "" then "--gcs-project-for-requester-pays " + select_first([google_project, ""]) else ""}
 
 
         echo "We are running ValidateSamFile on the output of PrintReads:"
