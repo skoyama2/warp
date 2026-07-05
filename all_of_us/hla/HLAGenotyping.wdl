@@ -122,9 +122,28 @@ task MakeHLAOnlyBamsAndFastqs {
     }
 
     command <<<
+        case "~{original_bam}" in
+            *.cram)
+                localized_input="input.cram"
+                ln -sf "~{original_bam}" "${localized_input}"
+                ln -sf "~{original_bam_idx}" "${localized_input}.crai"
+                ln -sf "~{original_bam_idx}" "input.crai"
+                ;;
+            *.bam)
+                localized_input="input.bam"
+                ln -sf "~{original_bam}" "${localized_input}"
+                ln -sf "~{original_bam_idx}" "${localized_input}.bai"
+                ln -sf "~{original_bam_idx}" "input.bai"
+                ;;
+            *)
+                echo "Input must be a BAM or CRAM: ~{original_bam}"
+                exit 1
+                ;;
+        esac
+
         # this command also produces the accompanying index hla.bai
         # the PairedReadFilter is necessary for SamtoFastq to succeed
-        gatk PrintReads -R ~{ref_fasta} -I ~{original_bam} -L ~{hla_intervals} -O hla-unsorted.bam \
+        gatk PrintReads -R ~{ref_fasta} -I "${localized_input}" -L ~{hla_intervals} -O hla-unsorted.bam \
             ~{if select_first([google_project, ""]) != "" then "--gcs-project-for-requester-pays " + select_first([google_project, ""]) else ""}
 
 
