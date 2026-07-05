@@ -22,6 +22,7 @@ workflow HLAGenotyping {
         File hla_groups_file
 
         String? google_project
+        Boolean localize_original_bam = false
         # WDL version 1.0 does not have an empty Optional literal
         # such a literal is very useful because Terra has a bug where whenever a data table is updated, empty values
         # silently and invisibly get converted to empty strings "".  Thus it is useful to recognize empty strings and
@@ -31,23 +32,44 @@ workflow HLAGenotyping {
     }
 
 
-    call MakeHLAOnlyBamsAndFastqs {
-        input:
-            gatk_docker = gatk_docker,
-            google_project = if select_first([google_project, ""]) == "" then EMPTY_STRING_HACK else google_project,
-            original_bam = original_bam,
-            original_bam_idx = original_bam_idx,
-            ref_fasta = ref_fasta,
-            ref_fai = ref_fai,
-            ref_dict = ref_dict,
-            hla_intervals = hla_intervals
+    if (localize_original_bam) {
+        call MakeHLAOnlyBamsAndFastqsLocalize {
+            input:
+                gatk_docker = gatk_docker,
+                google_project = if select_first([google_project, ""]) == "" then EMPTY_STRING_HACK else google_project,
+                original_bam = original_bam,
+                original_bam_idx = original_bam_idx,
+                ref_fasta = ref_fasta,
+                ref_fai = ref_fai,
+                ref_dict = ref_dict,
+                hla_intervals = hla_intervals
+        }
     }
+
+    if (localize_original_bam == false) {
+        call MakeHLAOnlyBamsAndFastqsCloudRead {
+            input:
+                gatk_docker = gatk_docker,
+                google_project = if select_first([google_project, ""]) == "" then EMPTY_STRING_HACK else google_project,
+                original_bam = original_bam,
+                original_bam_idx = original_bam_idx,
+                ref_fasta = ref_fasta,
+                ref_fai = ref_fai,
+                ref_dict = ref_dict,
+                hla_intervals = hla_intervals
+        }
+    }
+
+    File selected_hla_bam = select_first([MakeHLAOnlyBamsAndFastqsLocalize.hla_bam, MakeHLAOnlyBamsAndFastqsCloudRead.hla_bam])
+    File selected_hla_bam_idx = select_first([MakeHLAOnlyBamsAndFastqsLocalize.hla_bam_idx, MakeHLAOnlyBamsAndFastqsCloudRead.hla_bam_idx])
+    File selected_first_end_fastq = select_first([MakeHLAOnlyBamsAndFastqsLocalize.first_end_fastq, MakeHLAOnlyBamsAndFastqsCloudRead.first_end_fastq])
+    File selected_second_end_fastq = select_first([MakeHLAOnlyBamsAndFastqsLocalize.second_end_fastq, MakeHLAOnlyBamsAndFastqsCloudRead.second_end_fastq])
 
     call HLAHD {
         input:
             hlahd_docker = hlahd_docker,
-            first_end_fastq = MakeHLAOnlyBamsAndFastqs.first_end_fastq,
-            second_end_fastq = MakeHLAOnlyBamsAndFastqs.second_end_fastq,
+            first_end_fastq = selected_first_end_fastq,
+            second_end_fastq = selected_second_end_fastq,
             convert_alleles_python_script = convert_alleles_python_script,
             count_two_field_alleles_python_script = count_two_field_alleles_python_script,
             hla_groups_file = hla_groups_file
@@ -59,15 +81,15 @@ workflow HLAGenotyping {
         call Polysolver {
             input:
                 polysolver_docker = polysolver_docker,
-                hla_bam = MakeHLAOnlyBamsAndFastqs.hla_bam,
-                hla_bam_idx = MakeHLAOnlyBamsAndFastqs.hla_bam_idx
+                hla_bam = selected_hla_bam,
+                hla_bam_idx = selected_hla_bam_idx
         }
 
         call Optitype {
             input:
                 optitype_docker = optitype_docker,
-                first_end_fastq = MakeHLAOnlyBamsAndFastqs.first_end_fastq,
-                second_end_fastq = MakeHLAOnlyBamsAndFastqs.second_end_fastq
+                first_end_fastq = selected_first_end_fastq,
+                second_end_fastq = selected_second_end_fastq
         }
 
         call Consensus {
@@ -79,8 +101,8 @@ workflow HLAGenotyping {
     }
 
     output {
-        File hla_bam = MakeHLAOnlyBamsAndFastqs.hla_bam
-        File hla_bai = MakeHLAOnlyBamsAndFastqs.hla_bam_idx
+        File hla_bam = selected_hla_bam
+        File hla_bai = selected_hla_bam_idx
         File hlahd_raw_result = HLAHD.raw_result
         File hlahd_converted_result = HLAHD.converted_result
         Int hlahd_two_field_count = HLAHD.two_field_count
@@ -92,7 +114,7 @@ workflow HLAGenotyping {
     }
 }
 
-task MakeHLAOnlyBamsAndFastqs {
+task MakeHLAOnlyBamsAndFastqsLocalize {
     input {
         String gatk_docker
         String? google_project
@@ -125,14 +147,16 @@ task MakeHLAOnlyBamsAndFastqs {
         case "~{original_bam}" in
             *.cram)
                 localized_input="input.cram"
+                localized_input_idx="${localized_input}.crai"
                 ln -sf "~{original_bam}" "${localized_input}"
-                ln -sf "~{original_bam_idx}" "${localized_input}.crai"
+                ln -sf "~{original_bam_idx}" "${localized_input_idx}"
                 ln -sf "~{original_bam_idx}" "input.crai"
                 ;;
             *.bam)
                 localized_input="input.bam"
+                localized_input_idx="${localized_input}.bai"
                 ln -sf "~{original_bam}" "${localized_input}"
-                ln -sf "~{original_bam_idx}" "${localized_input}.bai"
+                ln -sf "~{original_bam_idx}" "${localized_input_idx}"
                 ln -sf "~{original_bam_idx}" "input.bai"
                 ;;
             *)
@@ -143,7 +167,78 @@ task MakeHLAOnlyBamsAndFastqs {
 
         # this command also produces the accompanying index hla.bai
         # the PairedReadFilter is necessary for SamtoFastq to succeed
-        gatk PrintReads -R ~{ref_fasta} -I "${localized_input}" -L ~{hla_intervals} -O hla-unsorted.bam \
+        gatk PrintReads -R ~{ref_fasta} -I "${localized_input}" --read-index "${localized_input_idx}" -L ~{hla_intervals} -O hla-unsorted.bam \
+            ~{if select_first([google_project, ""]) != "" then "--gcs-project-for-requester-pays " + select_first([google_project, ""]) else ""}
+
+
+        echo "We are running ValidateSamFile on the output of PrintReads:"
+        gatk ValidateSamFile -I hla-unsorted.bam
+
+        samtools sort -@ ~{num_threads} hla-unsorted.bam > hla.bam
+
+        # using gatk instead of samtools for indexing avoids ERROR:INVALID_INDEX_FILE_POINTER in the output
+        # of ValidateSamFile.  I'm not sure what that means or if it's important, but might as well not have it.
+        gatk BuildBamIndex -I hla.bam
+        #samtools index -@ ~{num_threads} hla.bam > hla.bai
+
+        echo "We are running ValidateSamFile on the output of samtools sorting and re-indexing"
+        gatk ValidateSamFile -I hla.bam
+
+        # The "*" MUST be in quotes.  -T "*" indicates that all tags are copied to output.
+        samtools fastq -@ ~{num_threads} -n -T "*" -0 /dev/null -1 first_end.fq -2 second_end.fq hla.bam
+    >>>
+
+    runtime {
+        docker: gatk_docker
+        bootDiskSizeGb: boot_disk_gb
+        memory: mem_gb + " GB"
+        disks: "local-disk " + disk_gb + " SSD"
+        preemptible: preemptible
+        maxRetries: max_retries
+        cpu: cpu
+    }
+
+    output {
+        File hla_bam = "hla.bam"
+        File hla_bam_idx = "hla.bai"
+        File first_end_fastq = "first_end.fq"
+        File second_end_fastq = "second_end.fq"
+    }
+}
+
+task MakeHLAOnlyBamsAndFastqsCloudRead {
+    input {
+        String gatk_docker
+        String? google_project
+        File original_bam       # this can be a BAM or CRAM
+        File original_bam_idx
+        File ref_fasta          # GATK PrintReads requires a reference for CRAMs
+        File ref_fai
+        File ref_dict
+        File hla_intervals
+
+        Int cpu = 2
+        Int num_threads = 4
+        Int mem_gb = 4
+        Int disk_gb = 100
+        Int boot_disk_gb = 10
+        Int max_retries = 0
+        Int preemptible = 1
+    }
+
+    parameter_meta{
+        hla_intervals: {localization_optional: true}
+        ref_fasta: {localization_optional: true}
+        ref_fai: {localization_optional: true}
+        ref_dict: {localization_optional: true}
+        original_bam: {localization_optional: true}
+        original_bam_idx: {localization_optional: true}
+    }
+
+    command <<<
+        # this command also produces the accompanying index hla.bai
+        # the PairedReadFilter is necessary for SamtoFastq to succeed
+        gatk PrintReads -R ~{ref_fasta} -I ~{original_bam} --read-index ~{original_bam_idx} -L ~{hla_intervals} -O hla-unsorted.bam \
             ~{if select_first([google_project, ""]) != "" then "--gcs-project-for-requester-pays " + select_first([google_project, ""]) else ""}
 
 

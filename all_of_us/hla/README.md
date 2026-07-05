@@ -35,6 +35,7 @@ Key characteristics:
 
 **Execution Environment Inputs:**
 - `String? gcs_project_for_requester_pays` – Optional input that is only required if input files are in a requester-pays bucket
+- `Boolean localize_original_bam` – Optional flag to force localization of the input BAM/CRAM and its index before running GATK. Defaults to `false`, allowing GATK to read the input directly when the execution environment has access.
 - `File? EMPTY_STRING_HACK` – Placeholder necessary to circumvent the outdated version of cromwell that Terra is tied to. Do not set this input, please leave it as is.
 
 #### Step 1. MakeHLAOnlyBamsAndFastqs
