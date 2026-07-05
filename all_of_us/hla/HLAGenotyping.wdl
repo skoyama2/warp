@@ -117,8 +117,8 @@ task MakeHLAOnlyBamsAndFastqs {
         ref_fasta: {localization_optional: true}
         ref_fai: {localization_optional: true}
         ref_dict: {localization_optional: true}
-        original_bam: {localization_optional: true}
-        original_bam_idx: {localization_optional: true}
+        # original_bam: {localization_optional: true}
+        # original_bam_idx: {localization_optional: true}
     }
 
     command <<<
